@@ -1,0 +1,78 @@
+name: Update Wordle Answers
+
+on:
+  schedule:
+    - cron: '10 5 * * *'  # 5:10 AM UTC = 1:10 AM EDT, after midnight rollover
+  workflow_dispatch:       # Allow manual trigger from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch today's answer
+        id: fetch
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+
+          if grep -q "\"$TODAY\"" index.html; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "Already have $TODAY — nothing to do."
+          else
+            RESPONSE=$(curl -s "https://www.nytimes.com/svc/wordle/v2/$TODAY.json")
+            ANSWER=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('solution',''))")
+            echo "answer=$ANSWER" >> "$GITHUB_OUTPUT"
+            echo "already=false" >> "$GITHUB_OUTPUT"
+            echo "Fetched $TODAY: $ANSWER"
+          fi
+
+      - name: Insert answer into index.html
+        if: steps.fetch.outputs.already == 'false' && steps.fetch.outputs.answer != ''
+        env:
+          TODAY: ${{ steps.fetch.outputs.today }}
+          ANSWER: ${{ steps.fetch.outputs.answer }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, sys
+
+          today  = os.environ['TODAY']
+          answer = os.environ['ANSWER']
+
+          with open('index.html', 'r') as f:
+              content = f.read()
+
+          new_entry = f'"{today}":"{answer}"'
+
+          updated = re.sub(
+              r'("(?:\d{4}-\d{2}-\d{2})":"(?:[a-z]+)")\n\};',
+              lambda m: f'{m.group(1)},{new_entry}\n}};',
+              content,
+              count=1
+          )
+
+          if updated == content:
+              print("ERROR: could not find insertion point in index.html", file=sys.stderr)
+              sys.exit(1)
+
+          with open('index.html', 'w') as f:
+              f.write(updated)
+
+          print(f"Inserted {today}: {answer}")
+          PYEOF
+
+      - name: Commit and push
+        if: steps.fetch.outputs.already == 'false' && steps.fetch.outputs.answer != ''
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --staged --quiet \
+            || git commit -m "chore: add Wordle answer ${{ steps.fetch.outputs.today }} (${{ steps.fetch.outputs.answer }})" \
+            && git push
