@@ -2203,7 +2203,11 @@ function formatDate(date) {
 }
 
 function toISODate(date) {
-  return date.toISOString().slice(0, 10);
+  // Use local date parts (not UTC) so midnight local time never shifts to the previous day
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -2514,7 +2518,7 @@ function shareResult() {
   const won = guesses.length && guesses[guesses.length-1] === answer;
   const score = won ? String(guesses.length) : 'X';
   const date = formatDate(getPuzzleDate(puzzleIndex));
-  let text = `Wordle Archive #${puzzleIndex + 1} ${score}/6 — ${date}\n\n`;
+  let text = `Wordle Archive #${puzzleIndex} ${score}/6 — ${date}\n\n`;
   guesses.forEach(g => {
     const result = scoreGuess(g, answer);
     text += result.map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('') + '\n';
@@ -2553,7 +2557,7 @@ function loadPuzzle(idx) {
 
 // ── Archive bar ────────────────────────────────────────────────────────────────
 function updateArchiveBar() {
-  document.getElementById('puzzle-label').textContent = `#${puzzleIndex + 1}`;
+  document.getElementById('puzzle-label').textContent = `#${puzzleIndex}`;
   const d = getPuzzleDate(puzzleIndex);
   document.getElementById('puzzle-date-input').value = toISODate(d);
   document.getElementById('prev-btn').disabled = puzzleIndex <= 0;
