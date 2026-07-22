@@ -2166,6 +2166,9 @@ const MAX_PUZZLE = (() => {
   today.setHours(0, 0, 0, 0);
   return Math.floor((today - START_DATE) / 86400000);
 })();
+// NYT assigns IDs offset from the app's 0-based day index (verified 2026-07-21: NYT id=2350, dayIndex=1858)
+const NYT_ID_OFFSET = 492;
+const getNYTId = idx => idx + NYT_ID_OFFSET;
 
 // ── State ────────────────────────────────────────────────────────────────────
 let puzzleIndex = MAX_PUZZLE;
@@ -2518,7 +2521,7 @@ function shareResult() {
   const won = guesses.length && guesses[guesses.length-1] === answer;
   const score = won ? String(guesses.length) : 'X';
   const date = formatDate(getPuzzleDate(puzzleIndex));
-  let text = `Wordle Archive #${puzzleIndex} ${score}/6 — ${date}\n\n`;
+  let text = `Wordle Archive #${getNYTId(puzzleIndex)} ${score}/6 — ${date}\n\n`;
   guesses.forEach(g => {
     const result = scoreGuess(g, answer);
     text += result.map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('') + '\n';
@@ -2557,7 +2560,7 @@ function loadPuzzle(idx) {
 
 // ── Archive bar ────────────────────────────────────────────────────────────────
 function updateArchiveBar() {
-  document.getElementById('puzzle-label').textContent = `#${puzzleIndex}`;
+  document.getElementById('puzzle-label').textContent = `#${getNYTId(puzzleIndex)}`;
   const d = getPuzzleDate(puzzleIndex);
   document.getElementById('puzzle-date-input').value = toISODate(d);
   document.getElementById('prev-btn').disabled = puzzleIndex <= 0;
